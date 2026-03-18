@@ -1,0 +1,10 @@
+task_id,priority,planned_start,start_day,planned_duration_hours,destination_uwi,task_type,shift
+T-2026-0001,medium,2026-03-17T08:45:00,2026-03-17,3.1,05-1200-501,cementing,day
+T-2026-0002,low,2026-03-17T09:30:00,2026-03-17,2.5,05-1200-502,inspection,day
+T-2026-0003,high,2026-03-17T10:15:00,2026-03-17,4.3,05-1200-503,transport,day
+T-2026-0004,medium,2026-03-17T11:00:00,2026-03-17,2.3,05-1200-504,acidizing,day
+T-2026-0005,low,2026-03-17T11:45:00,2026-03-17,3.9,05-1200-505,cementing,day
+T-2026-0006,high,2026-03-17T12:30:00,2026-03-17,3.3,05-1200-506,inspection,day
+T-2026-0007,medium,2026-03-18T00:05:00,2026-03-17,2.2,05-1200-507,transport,night
+T-2026-0008,low,2026-03-18T00:40:00,2026-03-17,3.8,05-1200-508,acidizing,night
+T-2026-0009,high,2026-03-18T01:15:00,2026-03-17,2.1,05-1200-509,cementing,night

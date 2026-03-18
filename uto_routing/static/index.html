@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Панель диспетчера УТО</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Интеллектуальная диспетчеризация</p>
+        <h1>Панель управления спецтехникой</h1>
+        <p class="hero-copy">
+          Русскоязычная панель для диспетчера: рекомендации по технике, маршруты по графу дорог,
+          группировка заявок, планирование смены, бенчмарки и наглядное движение машин на карте.
+        </p>
+      </div>
+      <div class="hero-actions">
+        <button id="reload-dataset-btn" class="secondary-button">Обновить данные</button>
+        <a class="secondary-button" href="/docs" target="_blank" rel="noreferrer">Swagger API</a>
+        <div id="reviewer-info" class="reviewer-box">
+          <span id="reviewer-name">Ревьювер</span>
+          <button id="logout-btn" class="secondary-button small-button">Выйти</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="page">
+      <section class="card">
+        <div class="section-header">
+          <div>
+            <h2>Сводка по данным</h2>
+            <p class="muted">Какой набор данных загружен, сколько в нем техники, дорог, скважин и заявок.</p>
+          </div>
+          <span id="dataset-mode-badge" class="badge">загрузка...</span>
+        </div>
+        <div id="summary-cards" class="summary-grid"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-header">
+          <div>
+            <h2>Живая карта движения</h2>
+            <p class="muted">
+              Машины, заявки, последние маршруты и проигрывание движения техники по сценарию.
+            </p>
+          </div>
+          <div class="hero-actions">
+            <span id="realtime-connection-badge" class="badge">подключение...</span>
+            <button id="refresh-live-state-btn" class="secondary-button small-button">Обновить состояние</button>
+          </div>
+        </div>
+        <div class="map-toolbar">
+          <label class="field compact-field">
+            <span>Сценарий для проигрывания</span>
+            <select id="map-playback-strategy"></select>
+          </label>
+          <label class="field compact-field">
+            <span>Скорость проигрывания</span>
+            <select id="playback-speed-select">
+              <option value="0.5">0.5x</option>
+              <option value="1" selected>1x</option>
+              <option value="2">2x</option>
+              <option value="4">4x</option>
+            </select>
+          </label>
+          <div class="actions no-margin">
+            <button id="run-replay-btn">Старт анимации</button>
+            <button id="pause-playback-btn" class="secondary-button">Пауза</button>
+            <button id="step-backward-btn" class="secondary-button">Шаг назад</button>
+            <button id="step-forward-btn" class="secondary-button">Шаг вперед</button>
+            <button id="reset-playback-btn" class="secondary-button">Сброс</button>
+          </div>
+        </div>
+        <label class="field">
+          <span>Шкала времени проигрывания</span>
+          <input id="playback-scrubber" type="range" min="0" max="0" value="0" />
+        </label>
+        <div class="map-layout">
+          <div id="operations-map" class="leaflet-map"></div>
+          <aside class="map-sidebar">
+            <div class="section-header compact-header">
+              <div>
+                <h3>Что происходит сейчас</h3>
+                <p class="muted">Текущий кадр, статус движения и занятость техники.</p>
+              </div>
+              <span id="playback-time-label" class="badge">нет проигрывания</span>
+            </div>
+            <div id="playback-meta" class="result-grid compact-grid"></div>
+            <div id="active-vehicles-panel" class="vehicle-list"></div>
+          </aside>
+        </div>
+        <div class="muted map-caption">
+          Основной режим обновления — WebSocket. Если сокет недоступен, панель автоматически переключается на резервный polling.
+        </div>
+      </section>
+
+      <section class="layout-grid">
+        <section class="card">
+          <div class="section-header">
+            <div>
+              <h2>Подбор техники под заявку</h2>
+              <p class="muted">Выберите существующую заявку или задайте новую вручную и получите лучший список машин.</p>
+            </div>
+          </div>
+
+          <div class="inline-toggle">
+            <label><input type="radio" name="recommendation-mode" value="existing" checked /> Заявка из набора</label>
+            <label><input type="radio" name="recommendation-mode" value="custom" /> Своя заявка</label>
+          </div>
+
+          <div class="form-grid">
+            <label class="field" id="existing-task-field">
+              <span>Заявка</span>
+              <select id="recommendation-task-id"></select>
+            </label>
+
+            <label class="field">
+              <span>Алгоритм</span>
+              <select id="recommendation-strategy"></select>
+            </label>
+
+            <label class="field">
+              <span>Сколько кандидатов показать</span>
+              <input id="recommendation-top-k" type="number" min="1" max="10" value="3" />
+            </label>
+          </div>
+
+          <div id="custom-task-form" class="form-grid hidden">
+            <label class="field">
+              <span>ID новой заявки</span>
+              <input id="custom-task-id" type="text" value="CUSTOM-UI-1" />
+            </label>
+            <label class="field">
+              <span>Приоритет</span>
+              <select id="custom-priority">
+                <option value="high">высокий</option>
+                <option value="medium">средний</option>
+                <option value="low">низкий</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Скважина / точка назначения</span>
+              <select id="custom-destination-uwi"></select>
+            </label>
+            <label class="field">
+              <span>Тип работ</span>
+              <select id="custom-task-type"></select>
+            </label>
+            <label class="field">
+              <span>Плановый старт</span>
+              <input id="custom-planned-start" type="datetime-local" value="2026-03-17T09:00" />
+            </label>
+            <label class="field">
+              <span>Длительность, часы</span>
+              <input id="custom-duration-hours" type="number" min="0.5" step="0.1" value="4.0" />
+            </label>
+            <label class="field">
+              <span>Смена</span>
+              <select id="custom-shift">
+                <option value="day">дневная</option>
+                <option value="night">ночная</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Операционный день</span>
+              <input id="custom-start-day" type="date" value="2026-03-17" />
+            </label>
+          </div>
+
+          <div class="actions">
+            <button id="run-recommendations-btn">Подобрать технику</button>
+          </div>
+          <div id="recommendations-status" class="status-line"></div>
+          <div id="recommendations-result"></div>
+        </section>
+
+        <section class="card">
+          <div class="section-header">
+            <div>
+              <h2>Маршрут до точки работ</h2>
+              <p class="muted">Построение пути по графу дорог от машины до выбранной скважины.</p>
+            </div>
+          </div>
+          <div class="form-grid">
+            <label class="field">
+              <span>Машина</span>
+              <select id="route-vehicle-id"></select>
+            </label>
+            <label class="field">
+              <span>Скважина</span>
+              <select id="route-well-uwi"></select>
+            </label>
+            <label class="field">
+              <span>Скорость, км/ч</span>
+              <input id="route-speed" type="number" min="1" step="0.1" placeholder="Необязательно" />
+            </label>
+          </div>
+          <div class="actions">
+            <button id="run-route-btn">Показать маршрут</button>
+          </div>
+          <div id="route-status" class="status-line"></div>
+          <div id="route-result"></div>
+          <div id="route-map" class="map-panel empty-state">Здесь появится линия маршрута.</div>
+        </section>
+      </section>
+
+      <section class="layout-grid">
+        <section class="card">
+          <div class="section-header">
+            <div>
+              <h2>Группировка заявок в один выезд</h2>
+              <p class="muted">Проверьте, какие заявки выгодно объединить в один маршрут, а какие оставить отдельно.</p>
+            </div>
+          </div>
+          <div class="inline-actions">
+            <button id="multitask-select-first-btn" class="secondary-button small-button">Первые 4</button>
+            <button id="multitask-select-day-btn" class="secondary-button small-button">Только день</button>
+            <button id="multitask-select-night-btn" class="secondary-button small-button">Только ночь</button>
+            <button id="multitask-clear-btn" class="secondary-button small-button">Снять выбор</button>
+          </div>
+          <div id="multitask-checkboxes" class="checkbox-grid"></div>
+          <div class="form-grid">
+            <label class="field">
+              <span>Макс. суммарное время выезда, мин</span>
+              <input id="multitask-max-time" type="number" min="1" value="480" />
+            </label>
+            <label class="field">
+              <span>Допустимый коэффициент крюка</span>
+              <input id="multitask-detour" type="number" min="1" step="0.1" value="1.3" />
+            </label>
+          </div>
+          <div class="actions">
+            <button id="run-multitask-btn">Оценить группировку</button>
+          </div>
+          <div id="multitask-status" class="status-line"></div>
+          <div id="multitask-result"></div>
+        </section>
+
+        <section class="card">
+          <div class="section-header">
+            <div>
+              <h2>План на смену / день</h2>
+              <p class="muted">Построение общего плана назначений по всем заявкам выбранным алгоритмом.</p>
+            </div>
+          </div>
+          <div class="form-grid">
+            <label class="field">
+              <span>Алгоритм</span>
+              <select id="plan-strategy"></select>
+            </label>
+          </div>
+          <div class="actions">
+            <button id="run-plan-btn">Построить план</button>
+          </div>
+          <div id="plan-status" class="status-line"></div>
+          <div id="plan-result"></div>
+        </section>
+      </section>
+
+      <section class="card">
+        <div class="section-header">
+          <div>
+            <h2>Бенчмарк алгоритмов</h2>
+            <p class="muted">Сравнение стратегий на множестве синтетических сценариев и запуск анимации движения техники.</p>
+          </div>
+        </div>
+        <div class="form-grid">
+          <label class="field">
+            <span>Количество сценариев</span>
+            <input id="benchmark-scenarios" type="number" min="1" max="5000" value="250" />
+          </label>
+          <label class="field">
+            <span>Мин. заявок</span>
+            <input id="benchmark-min-tasks" type="number" min="1" value="6" />
+          </label>
+          <label class="field">
+            <span>Макс. заявок</span>
+            <input id="benchmark-max-tasks" type="number" min="1" value="12" />
+          </label>
+          <label class="field">
+            <span>Мин. техники</span>
+            <input id="benchmark-min-vehicles" type="number" min="1" value="4" />
+          </label>
+          <label class="field">
+            <span>Макс. техники</span>
+            <input id="benchmark-max-vehicles" type="number" min="1" value="7" />
+          </label>
+          <label class="field">
+            <span>Seed</span>
+            <input id="benchmark-seed" type="number" value="42" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="run-benchmark-btn">Запустить бенчмарк</button>
+        </div>
+        <div id="benchmark-status" class="status-line"></div>
+        <div id="benchmark-result"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-header">
+          <div>
+            <h2>Подбор весов скоринга</h2>
+            <p class="muted">Поиск более удачных весов для жадного алгоритма назначения техники.</p>
+          </div>
+        </div>
+        <div class="form-grid">
+          <label class="field">
+            <span>Сколько кандидатов проверить</span>
+            <input id="tuning-candidate-limit" type="number" min="1" max="100" value="12" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="run-tuning-btn">Запустить подбор весов</button>
+        </div>
+        <div id="tuning-status" class="status-line"></div>
+        <div id="tuning-result"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-header">
+          <div>
+            <h2>Журнал решений диспетчера</h2>
+            <p class="muted">Последние расчеты, параметры запросов и объяснения того, что система сделала.</p>
+          </div>
+          <div class="hero-actions">
+            <button id="refresh-audit-btn" class="secondary-button small-button">Обновить журнал</button>
+            <button id="clear-audit-btn" class="secondary-button small-button">Очистить журнал</button>
+          </div>
+        </div>
+        <div id="audit-status" class="status-line"></div>
+        <div id="audit-result"></div>
+      </section>
+    </main>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <template id="summary-card-template">
+      <article class="summary-card">
+        <span class="summary-label"></span>
+        <strong class="summary-value"></strong>
+      </article>
+    </template>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

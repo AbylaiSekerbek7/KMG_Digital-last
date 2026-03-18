@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uto-routing-platform"
+version = "0.1.0"
+description = "Intelligent routing and dispatching platform for oilfield special vehicles."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn>=0.30.0",
+  "pydantic>=2.8.0",
+  "httpx>=0.27.0",
+  "psycopg[binary]>=3.2.0",
+  "ortools>=9.10.4067",
+  "websockets>=16.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["uto_routing*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

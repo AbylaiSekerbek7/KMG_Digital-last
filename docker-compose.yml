@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: uto-routing-postgres
+    environment:
+      POSTGRES_DB: uto_routing
+      POSTGRES_USER: uto
+      POSTGRES_PASSWORD: uto
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uto -d uto_routing"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+      - ./sample_dataset_csv:/seed-data:ro
+    restart: unless-stopped
+
+  uto-routing-platform:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: uto-routing-platform
+    ports:
+      - "${HOST_BIND:-0.0.0.0}:${HOST_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: "8000"
+      UTO_DATA_SOURCE: postgres
+      UTO_DATABASE_URL: postgresql://uto:uto@postgres:5432/uto_routing
+      UTO_ORTOOLS_TIME_LIMIT_SECONDS: "${UTO_ORTOOLS_TIME_LIMIT_SECONDS:-2}"
+      UTO_LOG_FORMAT: "${UTO_LOG_FORMAT:-json}"
+      UTO_LOG_LEVEL: "${UTO_LOG_LEVEL:-INFO}"
+      UTO_AUTH_MODE: "${UTO_AUTH_MODE:-none}"
+      UTO_REVIEWER_USERNAME: "${UTO_REVIEWER_USERNAME:-}"
+      UTO_REVIEWER_PASSWORD: "${UTO_REVIEWER_PASSWORD:-}"
+      UTO_REVIEWER_DISPLAY_NAME: "${UTO_REVIEWER_DISPLAY_NAME:-Reviewer}"
+      UTO_SESSION_SECRET: "${UTO_SESSION_SECRET:-}"
+      UTO_SESSION_COOKIE_NAME: "${UTO_SESSION_COOKIE_NAME:-uto_reviewer_session}"
+      UTO_SESSION_TTL_HOURS: "${UTO_SESSION_TTL_HOURS:-24}"
+      UTO_FORCE_SECURE_COOKIES: "${UTO_FORCE_SECURE_COOKIES:-false}"
+      UTO_WEBSOCKET_TOKEN: "${UTO_WEBSOCKET_TOKEN:-}"
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["share"]
+    depends_on:
+      uto-routing-platform:
+        condition: service_healthy
+    command: tunnel --no-autoupdate --url http://uto-routing-platform:8000
+    restart: unless-stopped

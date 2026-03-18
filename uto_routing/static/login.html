@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Вход в панель УТО</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="login-page">
+      <section class="login-card">
+        <p class="eyebrow">Reviewer Access</p>
+        <h1>Вход в панель диспетчера</h1>
+        <p class="muted">
+          Введите логин и пароль ревьювера, чтобы открыть карту, рекомендации, планирование и replay-анимацию.
+        </p>
+
+        <form id="login-form" class="form-grid">
+          <label class="field">
+            <span>Логин</span>
+            <input id="login-username" type="text" autocomplete="username" required />
+          </label>
+          <label class="field">
+            <span>Пароль</span>
+            <input id="login-password" type="password" autocomplete="current-password" required />
+          </label>
+          <div class="actions">
+            <button type="submit">Войти</button>
+          </div>
+        </form>
+
+        <div id="login-status" class="status-line"></div>
+      </section>
+    </main>
+    <script src="/static/login.js" defer></script>
+  </body>
+</html>

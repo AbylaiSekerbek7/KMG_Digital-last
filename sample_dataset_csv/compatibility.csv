@@ -1,0 +1,10 @@
+task_type,vehicle_type
+acidizing,ACN-12
+acidizing,CA-320
+cementing,CA-320
+cementing,Crane
+inspection,Crane
+inspection,Pickup
+inspection,Tractor
+transport,Pickup
+transport,Tractor
